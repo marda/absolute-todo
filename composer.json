@@ -1,0 +1,11 @@
+{
+  "name": "absolute.app/todo",
+  "description": "Absolute/Module/Todo",
+  "type": "package",
+  "license": ["MIT", "BSD-3-Clause", "GPL-2.0", "GPL-3.0"],
+  "minimum-stability": "dev",
+  "require": {
+    "absolute.app/core": "dev-master",
+    "absolute.app/label": "dev-master"
+  }  
+}
