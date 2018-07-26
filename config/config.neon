@@ -4,3 +4,5 @@
 #
 
 services:
+  - Absolute\Module\Todo\Manager\TodoManager
+  - Absolute\Module\Todo\Manager\TodoCRUDManager
