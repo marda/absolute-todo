@@ -5,8 +5,11 @@ namespace Absolute\Module\Todo\Manager;
 use Nette\Database\Context;
 use Absolute\Core\Manager\BaseManager;
 use Absolute\Module\Todo\Classes\Todo;
+use Absolute\Module\Todo\Classes\Link;
 use Absolute\Module\File\Manager\FileManager;
 use Absolute\Module\Team\Manager\TeamManager;
+use Absolute\Module\Category\Manager\CategoryManager;
+use Absolute\Module\User\Manager\UserManager;
 
 class TodoManager extends BaseManager
 {
@@ -17,11 +20,19 @@ class TodoManager extends BaseManager
     /** @var \Absolute\Module\File\Manager\FileManager  */
     public $fileManager;
 
-    public function __construct(Context $database,FileManager $fileManager,TeamManager $teamManager)
+    /** @var \Absolute\Module\Category\Manager\CategoryManager */
+    public $categoryManager;
+
+    /** @var \Absolute\Module\User\Manager\UserManager */
+    public $userManager;
+
+    public function __construct(Context $database, FileManager $fileManager, TeamManager $teamManager, CategoryManager $categoryManager, UserManager $userManager)
     {
         parent::__construct($database);
-        $this->teamManager=$teamManager;
-        $this->fileManager=$fileManager;
+        $this->teamManager = $teamManager;
+        $this->fileManager = $fileManager;
+        $this->categoryManager = $categoryManager;
+        $this->userManager = $userManager;
     }
 
     /* INTERNAL/EXTERNAL INTERFACE */
@@ -33,14 +44,14 @@ class TodoManager extends BaseManager
             return false;
         }
         $object = new Todo($db->id, $db->user_id, $db->parent_todo_id, $db->title, $db->note, $db->color, $db->start_date, $db->due_date, $db->starred, $db->priority, $db->done, $db->deleted, $db->created, $db->budget, $db->proposal_budget);
-        /* foreach ($db->related('todo_user') as $userDb) 
-          {
-          $user = $this->_getUser($userDb->user);
-          if ($user)
-          {
-          $object->addUser($user);
-          }
-          } */
+        foreach ($db->related('todo_user') as $userDb)
+        {
+            $user = $this->userManager->_getUser($userDb->user);
+            if ($user)
+            {
+                $object->addUser($user);
+            }
+        }
         foreach ($db->related('todo_team') as $teamDb)
         {
             $team = $this->teamManager->_getTeam($teamDb->team);
@@ -49,14 +60,14 @@ class TodoManager extends BaseManager
                 $object->addTeam($team);
             }
         }
-        /* foreach ($db->related('todo_category') as $categoryDb)
-          {
-          $category = $this->_getTeam($categoryDb->category);
-          if ($category)
-          {
-          $object->addCategory($category);
-          }
-          } */
+        foreach ($db->related('todo_category') as $categoryDb)
+        {
+            $category = $this->categoryManager->getCategory($categoryDb->category);
+            if ($category)
+            {
+                $object->addCategory($category);
+            }
+        }
         foreach ($db->related('todo_file') as $fileDb)
         {
             $file = $this->fileManager->_getFile($fileDb->file);
@@ -65,6 +76,16 @@ class TodoManager extends BaseManager
                 $object->addFile($file);
             }
         }
+        return $object;
+    }
+
+    protected function _getLink($db)
+    {
+        if ($db == false)
+        {
+            return false;
+        }
+        $object = new Link($db->id, $db->source_todo, $db->target_todo, $db->type);
         return $object;
     }
 
@@ -90,7 +111,7 @@ class TodoManager extends BaseManager
         return $object;
     }
 
-    private function _getList($userId,$offset, $limit)
+    private function _getList($userId, $offset, $limit)
     {
         $offset = $offset == null ? 0 : $offset;
         $limit = $limit == null ? 50 : $limit;
@@ -99,7 +120,7 @@ class TodoManager extends BaseManager
         foreach ($resultDb as $db)
         {
             $object = $this->_getTodo($db);
-            if($this->canUserView($object->getId(),$userId))
+            if ($this->canUserView($object->getId(), $userId))
                 $ret[] = $object;
         }
         return $ret;
@@ -381,47 +402,63 @@ class TodoManager extends BaseManager
         }
         return $ret;
     }
-    
-    /*private function _getTodoLinkList($noteId)
+
+    private function _getTodoLinkList($todoId)
     {
-        $ret = $this->database->fetchAll('SELECT `label`.* FROM `label` LEFT JOIN `todo_label` ON `label`.`id` = `todo_label`.`label_id` WHERE (`todo_label`.`todo_id` = ?)', $noteId);
+        $ret = array();
+        $resultDb = $this->database->table('todo_link')->where('source_todo', $todoId);
+        foreach ($resultDb as $db)
+        {
+            $object = $this->_getLink($db);
+            $ret[] = $object;
+        }
         return $ret;
     }
 
-    private function _getTodoLinkItem($noteId, $labelId)
+    private function _getTodoLinkItem($todoId, $linkId)
     {
-        $ret = $this->database->fetch('SELECT `label`.* FROM `label` LEFT JOIN `todo_label` ON `label`.`id` = `todo_label`.`label_id` WHERE (`todo_label`.`todo_id` = ?) AND (`label`.`id` = ?)', $noteId, $labelId);
-        return $ret;
+        return $this->_getLink($this->database->table('todo_link')->where('source_todo', $todoId)->where("target_todo", $linkId)->fetch());
     }
 
-    public function _linkTodoDelete($noteId, $labelId)
+    public function _linkTodoDelete($todoId, $linkId)
     {
-        return $this->database->table('todo_label')->where('label_id', $labelId)->where('todo_id', $noteId)->delete();
+        return $this->database->table('todo_link')->where('source_todo', $todoId)->where('target_todo', $linkId)->delete();
     }
 
-    public function _linkTodoCreate($noteId, $labelId)
+    public function _linkTodoCreate($noteId, $linkId, $type)
     {
-        return $this->database->table('todo_label')->insert(['label_id' => $labelId, 'todo_id' => $noteId]);
-    }
-    public function getTodoLinkList($noteId)
-    {
-        return $this->_getTodoLinkList($noteId);
+        return $this->database->table('todo_link')->insert(['target_todo' => $linkId, 'source_todo' => $noteId, 'type' => $type]);
     }
 
-    public function getTodoLinkItem($noteId, $labelId)
+    public function _linkTodoUpdate($noteId, $linkId, $type)
     {
-        return $this->_getTodoLinkItem($noteId, $labelId);
+        return $this->database->table('todo_link')->where(['target_todo' => $linkId, 'source_todo' => $noteId])->update( ['type' => $type]);
     }
 
-    public function linkTodoDelete($noteId, $labelId)
+    public function linkTodoUpdate($noteId, $linkId, $type)
     {
-        return $this->_linkTodoDelete($noteId, $labelId);
+        return $this->_linkTodoUpdate($noteId, $linkId, $type);
     }
 
-    public function linkTodoCreate($noteId, $labelId)
+    public function getTodoLinkList($todoId)
     {
-        return $this->_linkTodoCreate($noteId, $labelId);
-    }*/
+        return $this->_getTodoLinkList($todoId);
+    }
+
+    public function getTodoLinkItem($todoId, $targetId)
+    {
+        return $this->_getTodoLinkItem($todoId, $targetId);
+    }
+
+    public function linkTodoDelete($todoId, $targetId)
+    {
+        return $this->_linkTodoDelete($todoId, $targetId);
+    }
+
+    public function linkTodoCreate($todoId, $targetId, $type)
+    {
+        return $this->_linkTodoCreate($todoId, $targetId, $type);
+    }
 
     private function _getProjectDueDateCount($projectId, $dueDate)
     {
@@ -505,9 +542,9 @@ class TodoManager extends BaseManager
         return $this->_getById($id);
     }
 
-    public function getList($userId,$offset, $limit)
+    public function getList($userId, $offset, $limit)
     {
-        return $this->_getList($userId,$offset, $limit);
+        return $this->_getList($userId, $offset, $limit);
     }
 
     public function getProjectList($projectId)

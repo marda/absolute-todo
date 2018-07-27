@@ -7,6 +7,7 @@ use Nette\Application\Responses\JsonResponse;
 
 class LinkPresenter extends TodoBasePresenter
 {
+
     /** @var \Absolute\Module\Todo\Manager\TodoManager @inject */
     public $todoManager;
 
@@ -54,9 +55,9 @@ class LinkPresenter extends TodoBasePresenter
 
     private function _getLinkListRequest($idTodo)
     {
-        /*if ($this->todoManager->canLinkView($idTodo, $this->user->id))
+        if ($this->todoManager->canUserView($idTodo, $this->user->id))
         {
-            $ret = $this->todoManager->getTodoList($idTodo);
+            $ret = $this->todoManager->getTodoLinkList($idTodo);
             if (!$ret)
                 $this->httpResponse->setCode(Response::S404_NOT_FOUND);
             else
@@ -71,14 +72,14 @@ class LinkPresenter extends TodoBasePresenter
         else
         {
             $this->httpResponse->setCode(Response::S403_FORBIDDEN);
-        }*/
+        }
     }
 
-    private function _getLinkRequest($linkId, $labelId)
+    private function _getLinkRequest($idTodo, $linkId)
     {
-        /*if ($this->todoManager->canLinkView($linkId, $this->user->id))
+        if ($this->todoManager->canUserView($idTodo, $this->user->id))
         {
-            $ret = $this->todoManager->getTodoItem($linkId, $labelId);
+            $ret = $this->todoManager->getTodoLinkItem($idTodo, $linkId);
             if (!$ret)
                 $this->httpResponse->setCode(Response::S404_NOT_FOUND);
             else
@@ -88,14 +89,16 @@ class LinkPresenter extends TodoBasePresenter
             }
         }
         else
-            $this->httpResponse->setCode(Response::S403_FORBIDDEN);*/
+            $this->httpResponse->setCode(Response::S403_FORBIDDEN);
     }
 
     private function _postLinkRequest($urlId, $urlId2)
     {
-        /*if ($this->todoManager->canLinkEdit($urlId, $this->user->id))
+        $post = json_decode($this->httpRequest->getRawBody(), true);
+        $type = isset($post["type"]) ? $post["type"] : 0;
+        if ($this->todoManager->canUserEdit($urlId, $this->user->id))
         {
-            $ret = $this->todoManager->linkTodoCreate($urlId, $urlId2);
+            $ret = $this->todoManager->linkTodoCreate($urlId, $urlId2, $type);
             if (!$ret)
                 $this->httpResponse->setCode(Response::S500_INTERNAL_SERVER_ERROR);
             else
@@ -103,32 +106,33 @@ class LinkPresenter extends TodoBasePresenter
         }else
         {
             $this->httpResponse->setCode(Response::S403_FORBIDDEN);
-        }*/
+        }
     }
 
     private function _putLinkRequest($urlId, $urlId2)
     {
-        /*$post= json_encode($this->httpRequest->getRawBody(),true);
-        if ($this->todoManager->canLinkEdit($urlId, $this->user->id))
+        $post = json_decode($this->httpRequest->getRawBody(), true);
+        if ($this->todoManager->canUserEdit($urlId, $this->user->id))
         {
-            if(isset($post["type"]))
-                $ret = $this->todoManager->linkTodoUpdate($urlId, $urlId2,$post["type"]);
+            if (isset($post["type"]))
+            {
+                $ret = $this->todoManager->linkTodoUpdate($urlId, $urlId2, $post["type"]);
+                if (!$ret)
+                    $this->httpResponse->setCode(Response::S500_INTERNAL_SERVER_ERROR);
+                else
+                    $this->httpResponse->setCode(Response::S201_CREATED);
+            }
             else
-                $ret = $this->todoManager->linkTodoUpdate($urlId, $urlId2);
-            
-            if (!$ret)
-                $this->httpResponse->setCode(Response::S500_INTERNAL_SERVER_ERROR);
-            else
-                $this->httpResponse->setCode(Response::S201_CREATED);
+                $this->httpResponse->setCode(Response::S400_BAD_REQUEST);
         }else
         {
             $this->httpResponse->setCode(Response::S403_FORBIDDEN);
-        }*/
+        }
     }
 
     private function _deleteLinkRequest($urlId, $urlId2)
     {
-        /*if ($this->todoManager->canLinkEdit($urlId, $this->link->id))
+        if ($this->todoManager->canUserEdit($urlId, $this->user->id))
         {
             $ret = $this->todoManager->linkTodoDelete($urlId, $urlId2);
             if (!$ret)
@@ -138,7 +142,7 @@ class LinkPresenter extends TodoBasePresenter
         }else
         {
             $this->httpResponse->setCode(Response::S403_FORBIDDEN);
-        }*/
+        }
     }
 
 }
