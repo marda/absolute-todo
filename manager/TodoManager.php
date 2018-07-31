@@ -147,14 +147,14 @@ class TodoManager extends BaseManager
         {
             $object = $this->_getTodo($db);
             // Labels
-            foreach ($db->related('todo_label')->where('label_id', $labels) as $labelDb)
+            /*foreach ($db->related('todo_label')->where('label_id', $labels) as $labelDb)
             {
                 $label = $this->_getLabel($labelDb->label);
                 if ($label)
                 {
                     $object->addLabel($label);
                 }
-            }
+            }*/
             $ret[] = $object;
         }
         return $ret;
@@ -535,7 +535,37 @@ class TodoManager extends BaseManager
         return false;
     }
 
+    private function _getProjectItem($projectId, $todoId)
+    {
+        return $this->_getTodo($this->database->table('todo')->where(':project_todo.project_id', $projectId)->where("todo_id", $todoId)->fetch());
+    }
+
+    public function _todoProjectDelete($projectId, $todoId)
+    {
+        return $this->database->table('project_todo')->where('project_id', $projectId)->where('todo_id', $todoId)->delete();
+    }
+
+    public function _todoProjectCreate($projectId, $todoId)
+    {
+        return $this->database->table('project_todo')->insert(['project_id' => $projectId, 'todo_id' => $todoId]);
+    }
+
     /* EXTERNAL METHOD */
+
+    public function getProjectItem($projectId, $todoId)
+    {
+        return $this->_getProjectItem($projectId, $todoId);
+    }
+
+    public function todoProjectDelete($projectId, $todoId)
+    {
+        return $this->_todoProjectDelete($projectId, $todoId);
+    }
+
+    public function todoProjectCreate($projectId, $todoId)
+    {
+        return $this->_todoProjectCreate($projectId, $todoId);
+    }
 
     public function getById($id)
     {
